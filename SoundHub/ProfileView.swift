@@ -234,6 +234,7 @@ struct ProfileView: View {
             SettingsView()
                 .environmentObject(theme)
                 .environmentObject(player)
+                .environmentObject(auth)
                 .ignoresSafeArea(.all)
         }
         .sheet(isPresented: $showSectionSort) {
@@ -877,6 +878,8 @@ struct AccountHubSheet: View {
     @AppStorage("soundhub.language") private var languageRaw = AppLanguage.chinese.rawValue
     @Environment(\.dismiss) private var dismiss
 
+    @State private var showAccountCenter = false
+    @State private var platformDisplayExpanded = false
     @State private var showNeteaseLogin = false
     @State private var showQQLogin = false
     @State private var showKugouLogin = false
@@ -1128,6 +1131,8 @@ struct AccountHubSheet: View {
 
 struct SettingsView: View {
     @EnvironmentObject private var theme: ThemeStore
+    @EnvironmentObject private var auth: AuthStore
+    @ObservedObject private var platformPrefs = PlatformPreferenceStore.shared
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("soundhub.themeMode") private var themeModeRaw = SoundHubThemeMode.system.rawValue
@@ -1451,6 +1456,7 @@ struct SettingsView: View {
                 GlassBackdrop(customColor: theme.backgroundSyncAll ? theme.customBackground : nil)
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 16) {
+                        accountPlatformSection
                         themeSection
                         playbackSection
                         equalizerSection
@@ -1485,6 +1491,11 @@ struct SettingsView: View {
                 SoundHubHaptics.success()
             }
             .ignoresSafeArea()
+        }
+        .sheet(isPresented: $showAccountCenter) {
+            AccountCenterView()
+                .environmentObject(auth)
+                .environmentObject(theme)
         }
         .fullScreenCover(isPresented: $showFontImporter) {
             FontDocumentPicker { url in
@@ -1627,6 +1638,123 @@ struct SettingsView: View {
                     }
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
+        }
+    }
+
+    /// 账号与平台
+    private var accountPlatformSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("账号与平台")
+                .font(SoundHubFont.appFont(12, .semibold))
+                .foregroundStyle(Color.soundhubComment)
+                .padding(.horizontal, 4)
+
+            VStack(spacing: 0) {
+                Button {
+                    SoundHubHaptics.tap()
+                    showAccountCenter = true
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "person.crop.circle.badge.checkmark")
+                            .font(.system(size: 14))
+                            .foregroundStyle(Color.soundhubHighlight)
+                            .frame(width: 28)
+                        Text("账号登录")
+                            .font(SoundHubFont.appFont(15))
+                            .foregroundStyle(Color.soundhubLabel)
+                        Spacer()
+                        Text(platformPrefs.summaryText)
+                            .font(SoundHubFont.appFont(11))
+                            .foregroundStyle(Color.soundhubComment)
+                            .lineLimit(1)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(Color.soundhubComment.opacity(0.6))
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 13)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(GlassPressButtonStyle(scale: 0.99))
+
+                Divider().opacity(0.25).padding(.leading, 54)
+
+                Button {
+                    SoundHubHaptics.select()
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        platformDisplayExpanded.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "slider.horizontal.3")
+                            .font(.system(size: 14))
+                            .foregroundStyle(Color.soundhubHighlight)
+                            .frame(width: 28)
+                        Text("平台显示")
+                            .font(SoundHubFont.appFont(15))
+                            .foregroundStyle(Color.soundhubLabel)
+                        Spacer()
+                        Image(systemName: platformDisplayExpanded ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(Color.soundhubComment.opacity(0.6))
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 13)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(GlassPressButtonStyle(scale: 0.99))
+
+                if platformDisplayExpanded {
+                    VStack(spacing: 8) {
+                        ForEach(SearchProvider.allCases) { provider in
+                            platformToggleRow(provider)
+                        }
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.bottom, 12)
+                }
+            }
+            .background {
+                SoundHubGlass(shape: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        }
+    }
+
+    private func platformToggleRow(_ provider: SearchProvider) -> some View {
+        let enabled = platformPrefs.isEnabled(provider)
+        return HStack(spacing: 10) {
+            if let name = provider.brandImageName {
+                Image(name)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 26, height: 26)
+                    .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+            }
+            VStack(alignment: .leading, spacing: 1) {
+                Text(LocalizedStringKey(provider.rawValue))
+                    .font(SoundHubFont.appFont(14, .medium))
+                    .foregroundStyle(Color.soundhubLabel)
+                Text(enabled ? "已显示" : "已隐藏")
+                    .font(SoundHubFont.appFont(10))
+                    .foregroundStyle(Color.soundhubComment)
+            }
+            Spacer()
+            Image(systemName: enabled ? "checkmark.circle.fill" : "circle")
+                .font(.system(size: 19))
+                .foregroundStyle(enabled ? Color.soundhubHighlight : Color.soundhubComment.opacity(0.5))
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 9)
+        .background {
+            RoundedRectangle(cornerRadius: 13, style: .continuous)
+                .fill(Color.primary.opacity(enabled ? 0.06 : 0.03))
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if enabled && platformPrefs.enabledSearchProviders.count <= 1 { return }
+            SoundHubHaptics.select()
+            platformPrefs.set(provider, enabled: !enabled)
         }
     }
 
