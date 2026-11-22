@@ -5,6 +5,7 @@ struct DownloadView: View {
     @EnvironmentObject private var player: PlayerManager
     @EnvironmentObject private var theme: ThemeStore
     @ObservedObject private var store = DownloadStore.shared
+    @ObservedObject private var location = DownloadLocation.shared
 
     private enum Segment: String, CaseIterable { case songs = "歌曲", files = "文件" }
 
@@ -15,6 +16,8 @@ struct DownloadView: View {
     @State private var scanResult = ""
     @State private var shareFile: ShareFileItem?
     @State private var showShareSheet = false
+    @State private var showFolderPicker = false
+    @State private var showLocationOptions = false
 
     private var filteredTracks: [DownloadedTrack] {
         let keyword = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -52,6 +55,31 @@ struct DownloadView: View {
             .navigationBarHidden(true)
             .sheet(isPresented: $showShareSheet) {
                 if let shareFile { ShareSheet(items: [shareFile.url]) }
+            }
+            .sheet(isPresented: $showFolderPicker) {
+                FolderPicker { url in
+                    guard let url else { return }
+                    do {
+                        try location.setCustomFolder(url)
+                        ToastCenter.shared.show("下载位置已切换到「\(url.lastPathComponent)」")
+                    } catch {
+                        ToastCenter.shared.show("无法使用该目录：\(error.localizedDescription)")
+                    }
+                }
+            }
+            .confirmationDialog("下载位置", isPresented: $showLocationOptions, titleVisibility: .visible) {
+                Button("选择自定义文件夹") { showFolderPicker = true }
+                if location.isCustom {
+                    Button("恢复为应用内目录", role: .destructive) {
+                        location.resetToInternal()
+                        ToastCenter.shared.show("下载位置已恢复为应用内")
+                    }
+                }
+                Button("取消", role: .cancel) {}
+            } message: {
+                Text(location.isCustom
+                     ? "当前：\(location.displayName)。已下载的文件不会自动搬迁。"
+                     : "默认保存在应用内，卸载 App 会一起删除。可改为自定义文件夹。")
             }
         }
     }
@@ -109,29 +137,44 @@ struct DownloadView: View {
                     segment = item
                     searchText = ""
                 } label: {
-                    VStack(spacing: 6) {
+                    VStack(spacing: 7) {
                         Text(item.rawValue)
-                            .font(SoundHubFont.appFont(15, segment == item ? .semibold : .regular))
-                            .foregroundStyle(segment == item ? Color.soundhubLabel : Color.soundhubComment)
+                            .font(SoundHubFont.appFont(16, .semibold))
+                            .foregroundStyle(segment == item ? Color.primary : Color.primary.opacity(0.45))
                         Capsule()
                             .fill(segment == item ? Color.soundhubHighlight : Color.clear)
-                            .frame(width: 26, height: 2.5)
+                            .frame(width: 28, height: 3)
                     }
                     .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
+        }
+        .padding(.horizontal, 6)
+        .padding(.bottom, 4)
+        .background(alignment: .bottom) {
+            Rectangle()
+                .fill(Color.primary.opacity(0.08))
+                .frame(height: 0.5)
         }
     }
 
     private var infoCards: some View {
         HStack(spacing: 10) {
-            infoCard(
-                icon: "internaldrive",
-                title: "下载位置",
-                subtitle: "应用内",
-                footer: "⚠️ 卸载 App 会删除"
-            )
+            Button {
+                SoundHubHaptics.tap()
+                showLocationOptions = true
+            } label: {
+                infoCard(
+                    icon: "internaldrive",
+                    title: "下载位置",
+                    subtitle: location.displayName,
+                    footer: location.isCustom ? "点按可更换目录" : "⚠️ 卸载 App 会删除"
+                )
+            }
+            .buttonStyle(.plain)
             Button {
                 SoundHubHaptics.tap()
                 let report = store.duplicateReport()

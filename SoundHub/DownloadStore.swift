@@ -38,21 +38,24 @@ final class DownloadStore: ObservableObject {
 
     @Published private(set) var tracks: [DownloadedTrack] = []
 
-    let directory: URL
+    /// 索引始终放在 App 内，避免用户换目录后丢失下载记录
     private let indexURL: URL
     private let fileManager = FileManager.default
 
     private init() {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? URL(fileURLWithPath: NSTemporaryDirectory())
-        directory = base.appendingPathComponent("SoundHubDownloads", isDirectory: true)
-        indexURL = directory.appendingPathComponent("index.json")
+        let indexDirectory = base.appendingPathComponent("SoundHubDownloads", isDirectory: true)
+        try? fileManager.createDirectory(at: indexDirectory, withIntermediateDirectories: true)
+        indexURL = indexDirectory.appendingPathComponent("index.json")
         try? fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
         loadIndex()
         pruneMissingFiles()
     }
 
     // MARK: - 读写
+
+    var directory: URL { DownloadLocation.shared.directory }
 
     func fileURL(for track: DownloadedTrack) -> URL {
         directory.appendingPathComponent(track.fileName)
@@ -74,12 +77,14 @@ final class DownloadStore: ObservableObject {
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let unique = String(UUID().uuidString.prefix(4))
         let fileName = "\(safe.isEmpty ? "track" : safe)-\(unique).\(ext)"
-        let dest = directory.appendingPathComponent(fileName)
-        do {
-            try fileManager.copyItem(at: source, to: dest)
-        } catch {
-            return nil
+        var dest = directory.appendingPathComponent(fileName)
+        var copied = false
+        DownloadLocation.shared.withDirectory { dir in
+            dest = dir.appendingPathComponent(fileName)
+            try? fileManager.removeItem(at: dest)
+            if (try? fileManager.copyItem(at: source, to: dest)) != nil { copied = true }
         }
+        guard copied else { return nil }
         let size = (try? fileManager.attributesOfItem(atPath: dest.path)[.size] as? NSNumber)?.int64Value ?? 0
         let track = DownloadedTrack(
             id: trackID,
@@ -117,11 +122,15 @@ final class DownloadStore: ObservableObject {
 
     /// 下载目录里的全部文件（含未入库的散落文件）
     func allFiles() -> [URL] {
-        let items = (try? fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.fileSizeKey, .contentModificationDateKey])) ?? []
-        return items
-            .filter { $0.lastPathComponent != "index.json" }
-            .filter { !$0.hasDirectoryPath }
-            .sorted { $0.lastPathComponent < $1.lastPathComponent }
+        var result: [URL] = []
+        DownloadLocation.shared.withDirectory { dir in
+            let items = (try? fileManager.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.fileSizeKey, .contentModificationDateKey])) ?? []
+            result = items
+                .filter { $0.lastPathComponent != "index.json" }
+                .filter { !$0.hasDirectoryPath }
+                .sorted { $0.lastPathComponent < $1.lastPathComponent }
+        }
+        return result
     }
 
     var totalBytes: Int64 {
