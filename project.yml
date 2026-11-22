@@ -1,0 +1,55 @@
+name: SoundHub
+
+options:
+  deploymentTarget:
+    iOS: "15.0"
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+
+targets:
+  SoundHub:
+    type: application
+    platform: iOS
+    sources: [SoundHub]
+    resources:
+      - SoundHub/en.lproj
+      - SoundHub/zh-Hans.lproj
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.qiangnanbie.soundhub
+        # 自动签名时把你的 10 位 Team ID 填这里（developer.apple.com → Membership）
+        # DEVELOPMENT_TEAM: XXXXXXXXXX
+        MARKETING_VERSION: "1.6.5.1"
+        CURRENT_PROJECT_VERSION: "39"
+        TARGETED_DEVICE_FAMILY: "1"
+        SWIFT_OBJC_BRIDGING_HEADER: SoundHub/SoundHub-Bridging-Header.h
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    info:
+      path: SoundHub/Info.plist
+      properties:
+        CFBundleDisplayName: 南离
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UIBackgroundModes: [audio]
+        UILaunchScreen:
+          UIImageName: LaunchBackground
+          UIColorName: LaunchBackgroundColor
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
+        CADisableMinimumFrameDurationOnPhone: true
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+
+schemes:
+  SoundHub:
+    build:
+      targets:
+        SoundHub: all
+    run:
+      config: Debug
+    archive:
+      config: Release
