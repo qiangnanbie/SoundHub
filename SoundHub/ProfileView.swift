@@ -1133,6 +1133,23 @@ struct SettingsView: View {
     @ObservedObject private var platformPrefs = PlatformPreferenceStore.shared
     @State private var showAccountCenter = false
     @State private var platformDisplayExpanded = false
+    @AppStorage("soundhub.immersiveDetail") private var immersiveDetail = true
+    @AppStorage("soundhub.lockScreenImmersiveCover") private var lockScreenImmersiveCover = true
+    @AppStorage("soundhub.disableLiquid") private var disableLiquidMode = false
+    @AppStorage("soundhub.tabIconStyle") private var tabIconStyle = "sfSymbols"
+    @AppStorage("soundhub.liquidTintHex") private var liquidTintHex = ""
+    @AppStorage("soundhub.globalParticleStyle") private var globalParticleStyle = "off"
+    @AppStorage("soundhub.dailyRecommendLegacy") private var dailyRecommendLegacy = false
+    @AppStorage("soundhub.hideSponsor") private var hideSponsor = true
+    @AppStorage("soundhub.playbackSourceMode") private var playbackSourceMode = "auto"
+    @AppStorage("soundhub.quality.byNetwork") private var qualityByNetwork = false
+    @AppStorage("soundhub.quality.wifi") private var wifiQualityRaw = SoundHubAudioQuality.hires.rawValue
+    @AppStorage("soundhub.quality.cellular") private var cellularQualityRaw = SoundHubAudioQuality.exhigh.rawValue
+    @AppStorage("soundhub.playback.autoSwitchPlatform") private var autoSwitchPlatform = true
+    @State private var showFeedbackSheet = false
+    @State private var showDisclaimerSheet = false
+    @State private var showEnvironmentSheet = false
+    @State private var sourceQualityExpanded = false
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("soundhub.themeMode") private var themeModeRaw = SoundHubThemeMode.system.rawValue
@@ -1456,9 +1473,11 @@ struct SettingsView: View {
                     LazyVStack(alignment: .leading, spacing: 16) {
                         accountPlatformSection
                         themeSection
+                        sourceQualitySection
                         playbackSection
                         equalizerSection
                         changelogSection
+                        supportSection
                         backupSection
                         logSection
                         footerNote
@@ -1529,6 +1548,15 @@ struct SettingsView: View {
         .sheet(isPresented: $showLogViewer) {
             LogViewerSheet(importedText: nil)
                 .environmentObject(theme)
+        }
+        .sheet(isPresented: $showFeedbackSheet) {
+            infoSheet(title: "问题反馈", body: "遇到问题时请附上复现步骤与截图，反馈到 GitHub Issues：\nhttps://github.com/qiangnanbie/SoundHub/issues")
+        }
+        .sheet(isPresented: $showDisclaimerSheet) {
+            infoSheet(title: "免责声明", body: infoSheetText.disclaimer)
+        }
+        .sheet(isPresented: $showEnvironmentSheet) {
+            infoSheet(title: "运行环境", body: infoSheetText.environment)
         }
         .sheet(isPresented: $showSourceManager) {
             ThirdPartySourceManagerSheet()
@@ -1817,6 +1845,84 @@ struct SettingsView: View {
                                 .font(SoundHubFont.appFont(15))
                                 .foregroundStyle(Color.soundhubLabel)
                         }
+                    }
+                }
+                .toggleStyle(.switch)
+                .tint(Color.soundhubAmber)
+
+                Toggle(isOn: $immersiveDetail) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "rectangle.portrait.on.rectangle.portrait")
+                            .font(.system(size: 14))
+                            .foregroundStyle(Color.soundhubAmber)
+                            .frame(width: 28)
+                        Text("沉浸详情界面")
+                            .font(SoundHubFont.appFont(15))
+                            .foregroundStyle(Color.soundhubLabel)
+                    }
+                }
+                .toggleStyle(.switch)
+                .tint(Color.soundhubAmber)
+
+                Toggle(isOn: $lockScreenImmersiveCover) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "lock.rectangle.stack")
+                            .font(.system(size: 14))
+                            .foregroundStyle(Color.soundhubAmber)
+                            .frame(width: 28)
+                        Text("锁屏沉浸封面")
+                            .font(SoundHubFont.appFont(15))
+                            .foregroundStyle(Color.soundhubLabel)
+                    }
+                }
+                .toggleStyle(.switch)
+                .tint(Color.soundhubAmber)
+
+                Toggle(isOn: $disableLiquidMode) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "drop.halffull")
+                            .font(.system(size: 14))
+                            .foregroundStyle(Color.soundhubAmber)
+                            .frame(width: 28)
+                        Text("关闭液态模式")
+                            .font(SoundHubFont.appFont(15))
+                            .foregroundStyle(Color.soundhubLabel)
+                    }
+                }
+                .toggleStyle(.switch)
+                .tint(Color.soundhubAmber)
+
+                pickerRow(title: "底栏图标样式", icon: "square.grid.2x2", selection: $tabIconStyle, options: [
+                    ("appleMusic", "Apple Music"), ("sfSymbols", "SF Symbols"), ("rounded", "圆润样式")
+                ])
+
+                pickerRow(title: "全局漂浮特效", icon: "sparkles", selection: $globalParticleStyle, options: [
+                    ("off", "关闭"), ("snow", "雪花"), ("text", "文字 / Emoji")
+                ])
+
+                Toggle(isOn: $dailyRecommendLegacy) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "clock.arrow.circlepath")
+                            .font(.system(size: 14))
+                            .foregroundStyle(Color.soundhubAmber)
+                            .frame(width: 28)
+                        Text("每日推荐使用旧版样式")
+                            .font(SoundHubFont.appFont(15))
+                            .foregroundStyle(Color.soundhubLabel)
+                    }
+                }
+                .toggleStyle(.switch)
+                .tint(Color.soundhubAmber)
+
+                Toggle(isOn: $hideSponsor) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "hand.raised.slash")
+                            .font(.system(size: 14))
+                            .foregroundStyle(Color.soundhubAmber)
+                            .frame(width: 28)
+                        Text("隐藏自愿赞助")
+                            .font(SoundHubFont.appFont(15))
+                            .foregroundStyle(Color.soundhubLabel)
                     }
                 }
                 .toggleStyle(.switch)
@@ -2378,6 +2484,158 @@ struct SettingsView: View {
     }
 
     /// 播放与歌词设置。
+    /// 音源与音质
+    private var sourceQualitySection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Button {
+                SoundHubHaptics.select()
+                withAnimation(.easeInOut(duration: 0.22)) { sourceQualityExpanded.toggle() }
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "waveform.circle.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(Color.soundhubAmber)
+                        .frame(width: 28)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("音源与音质")
+                            .font(SoundHubFont.appFont(15))
+                            .foregroundStyle(Color.soundhubLabel)
+                        Text(qualityByNetwork ? "已按 Wi-Fi / 蜂窝网络分别选择" : "统一使用当前音质")
+                            .font(SoundHubFont.appFont(10))
+                            .foregroundStyle(Color.soundhubComment)
+                    }
+                    Spacer()
+                    Image(systemName: sourceQualityExpanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color.soundhubComment.opacity(0.6))
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 13)
+                .background { SoundHubGlass(shape: RoundedRectangle(cornerRadius: 18, style: .continuous)) }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(GlassPressButtonStyle(scale: 0.98))
+
+            if sourceQualityExpanded {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("播放来源")
+                        .font(SoundHubFont.appFont(13, .semibold))
+                        .foregroundStyle(Color.soundhubLabel)
+                    Picker("播放来源", selection: $playbackSourceMode) {
+                        Text("自动").tag("auto")
+                        Text("官方").tag("official")
+                        Text("第三方").tag("thirdParty")
+                    }
+                    .pickerStyle(.segmented)
+                    Text("优先官方，失败后尝试已启用音源")
+                        .font(SoundHubFont.appFont(10))
+                        .foregroundStyle(Color.soundhubComment)
+
+                    Toggle(isOn: $qualityByNetwork) {
+                        Text("按网络类型选择音质")
+                            .font(SoundHubFont.appFont(14))
+                            .foregroundStyle(Color.soundhubLabel)
+                    }
+                    .toggleStyle(.switch)
+                    .tint(Color.soundhubAmber)
+
+                    qualityChips(title: "Wi-Fi", selection: $wifiQualityRaw)
+                    qualityChips(title: "蜂窝数据", selection: $cellularQualityRaw)
+
+                    Toggle(isOn: $autoSwitchPlatform) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("播放失败时切换平台")
+                                .font(SoundHubFont.appFont(14))
+                                .foregroundStyle(Color.soundhubLabel)
+                            Text("当前平台音源失败后，匹配其它平台的同一首歌")
+                                .font(SoundHubFont.appFont(10))
+                                .foregroundStyle(Color.soundhubComment)
+                        }
+                    }
+                    .toggleStyle(.switch)
+                    .tint(Color.soundhubAmber)
+
+                    Button {
+                        SoundHubHaptics.tap()
+                        showSourceManager = true
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "shippingbox")
+                                .font(.system(size: 13))
+                                .foregroundStyle(Color.soundhubHighlight)
+                            Text("管理 / 导入音源")
+                                .font(SoundHubFont.appFont(13, .medium))
+                                .foregroundStyle(Color.soundhubLabel)
+                            Spacer()
+                            Text("\(customSourceCount) 个")
+                                .font(SoundHubFont.appFont(11))
+                                .foregroundStyle(Color.soundhubComment)
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(Color.soundhubComment.opacity(0.6))
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .background { RoundedRectangle(cornerRadius: 13, style: .continuous).fill(Color.primary.opacity(0.05)) }
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(14)
+                .background { SoundHubGlass(shape: RoundedRectangle(cornerRadius: 18, style: .continuous)) }
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            }
+        }
+    }
+
+    private func qualityChips(title: String, selection: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(SoundHubFont.appFont(12, .semibold))
+                .foregroundStyle(Color.soundhubLabel)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(SoundHubAudioQuality.allCases) { quality in
+                        let selected = selection.wrappedValue == quality.rawValue
+                        Button {
+                            selection.wrappedValue = quality.rawValue
+                            SoundHubHaptics.select()
+                        } label: {
+                            Text(quality.displayName)
+                                .font(SoundHubFont.appFont(12, .medium))
+                                .foregroundStyle(selected ? Color.white : Color.soundhubLabel)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background {
+                                    Capsule().fill(selected ? Color.soundhubHighlight : Color.primary.opacity(0.06))
+                                }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
+
+    private func pickerRow(title: String, icon: String, selection: Binding<String>, options: [(String, String)]) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 14))
+                .foregroundStyle(Color.soundhubAmber)
+                .frame(width: 28)
+            Text(LocalizedStringKey(title))
+                .font(SoundHubFont.appFont(15))
+                .foregroundStyle(Color.soundhubLabel)
+            Spacer()
+            Picker(title, selection: selection) {
+                ForEach(options, id: \.0) { option in
+                    Text(LocalizedStringKey(option.1)).tag(option.0)
+                }
+            }
+            .pickerStyle(.menu)
+            .tint(Color.soundhubComment)
+        }
+    }
+
     private var equalizerSection: some View {
         Button {
             SoundHubHaptics.select()
@@ -2644,6 +2902,80 @@ struct SettingsView: View {
     }
 
     /// 更新日志入口
+    /// 关于与支持
+    private var supportSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionHeader(title: "关于与支持")
+            VStack(spacing: 0) {
+                supportRow(icon: "bubble.left.and.bubble.right", title: "问题反馈") {
+                    showFeedbackSheet = true
+                }
+                Divider().opacity(0.2).padding(.leading, 46)
+                supportRow(icon: "trash.circle", title: "缓存清理") {
+                    URLCache.shared.removeAllCachedResponses()
+                    ImageFileCache.removeAll()
+                    SoundHubHaptics.success()
+                    ToastCenter.shared.show("缓存已清理")
+                }
+                Divider().opacity(0.2).padding(.leading, 46)
+                supportRow(icon: "exclamationmark.triangle", title: "免责声明") {
+                    showDisclaimerSheet = true
+                }
+                Divider().opacity(0.2).padding(.leading, 46)
+                supportRow(icon: "iphone", title: "运行环境") {
+                    showEnvironmentSheet = true
+                }
+            }
+            .background { SoundHubGlass(shape: RoundedRectangle(cornerRadius: 18, style: .continuous)) }
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        }
+    }
+
+    private func supportRow(icon: String, title: String, action: @escaping () -> Void) -> some View {
+        Button {
+            SoundHubHaptics.tap()
+            action()
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.system(size: 14))
+                    .foregroundStyle(Color.soundhubHighlight)
+                    .frame(width: 26)
+                Text(LocalizedStringKey(title))
+                    .font(SoundHubFont.appFont(15))
+                    .foregroundStyle(Color.soundhubLabel)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color.soundhubComment.opacity(0.6))
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 13)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(GlassPressButtonStyle(scale: 0.99))
+    }
+
+    private var infoSheetText: (disclaimer: String, environment: String) {
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
+        let device = UIDevice.current
+        let env = """
+        应用版本：\(version) (\(build))
+        系统版本：\(device.systemName) \(device.systemVersion)
+        设备型号：\(device.model)
+        架构：\(ProcessInfo.processInfo.environment["SIMULATOR_MODEL_IDENTIFIER"] ?? "真机")
+        """
+        let disclaimer = """
+        本应用仅供个人学习与技术研究使用。
+
+        所有音乐内容版权归网易云音乐、QQ 音乐、酷狗音乐等平台所有，本应用不提供任何内容托管与下载服务。
+
+        请支持正版音乐。使用本应用产生的任何后果由使用者自行承担。
+        """
+        return (disclaimer, env)
+    }
+
     private var changelogSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Button {
@@ -3053,6 +3385,32 @@ struct SettingsView: View {
             .padding(14)
             .background {
                 SoundHubGlass(shape: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            }
+        }
+    }
+
+    private func infoSheet(title: String, body: String) -> some View {
+        SoundHubNavigationStack {
+            ZStack {
+                GlassBackdrop(customColor: theme.backgroundSyncAll ? theme.customBackground : nil)
+                ScrollView {
+                    Text(body)
+                        .font(SoundHubFont.appFont(13))
+                        .foregroundStyle(Color.soundhubLabel)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(20)
+                }
+            }
+            .navigationTitle(LocalizedStringKey(title))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("完成") {
+                        showFeedbackSheet = false
+                        showDisclaimerSheet = false
+                        showEnvironmentSheet = false
+                    }
+                }
             }
         }
     }

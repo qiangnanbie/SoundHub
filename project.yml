@@ -21,7 +21,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.qiangnanbie.soundhub
         # 自动签名时把你的 10 位 Team ID 填这里（developer.apple.com → Membership）
         # DEVELOPMENT_TEAM: XXXXXXXXXX
-        MARKETING_VERSION: "1.8.4"
+        MARKETING_VERSION: "1.8.5"
         CURRENT_PROJECT_VERSION: "54"
         TARGETED_DEVICE_FAMILY: "1"
         SWIFT_OBJC_BRIDGING_HEADER: SoundHub/SoundHub-Bridging-Header.h
