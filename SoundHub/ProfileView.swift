@@ -1590,7 +1590,6 @@ struct SettingsView: View {
     private var themeSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             appearanceSection
-            platformSection
         }
     }
 
@@ -1621,49 +1620,6 @@ struct SettingsView: View {
             ToastCenter.shared.show("主页问候字体已应用：\(name)")
         } else {
             ToastCenter.shared.show("主页问候字体安装失败，请使用 ttf / otf 文件")
-        }
-    }
-
-    private var platformSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Button {
-                SoundHubHaptics.select()
-                withAnimation(.easeInOut(duration: 0.22)) {
-                    platformExpanded.toggle()
-                }
-            } label: {
-                HStack(spacing: 12) {
-                    Image(systemName: "checklist")
-                        .font(.system(size: 14))
-                        .foregroundStyle(Color.soundhubAmber)
-                        .frame(width: 28)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("平台显示")
-                            .font(SoundHubFont.appFont(15))
-                            .foregroundStyle(Color.soundhubLabel)
-                    }
-                    Spacer()
-                    Image(systemName: platformExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Color.soundhubComment.opacity(0.6))
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 13)
-                .background {
-                    SoundHubGlass(shape: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(GlassPressButtonStyle(scale: 0.98))
-
-            if platformExpanded {
-                PlatformPreferencePicker()
-                    .padding(14)
-                    .background {
-                        SoundHubGlass(shape: RoundedRectangle(cornerRadius: 22, style: .continuous))
-                    }
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-            }
         }
     }
 
@@ -1731,56 +1687,16 @@ struct SettingsView: View {
                 .buttonStyle(GlassPressButtonStyle(scale: 0.99))
 
                 if platformDisplayExpanded {
-                    VStack(spacing: 8) {
-                        ForEach(SearchProvider.allCases) { provider in
-                            platformToggleRow(provider)
-                        }
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.bottom, 12)
+                    PlatformPreferencePicker()
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, 12)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
                 }
             }
             .background {
                 SoundHubGlass(shape: RoundedRectangle(cornerRadius: 18, style: .continuous))
             }
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        }
-    }
-
-    private func platformToggleRow(_ provider: SearchProvider) -> some View {
-        let enabled = platformPrefs.isEnabled(provider)
-        return HStack(spacing: 10) {
-            if let name = provider.brandImageName {
-                Image(name)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 26, height: 26)
-                    .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
-            }
-            VStack(alignment: .leading, spacing: 1) {
-                Text(LocalizedStringKey(provider.rawValue))
-                    .font(SoundHubFont.appFont(14, .medium))
-                    .foregroundStyle(Color.soundhubLabel)
-                Text(enabled ? "已显示" : "已隐藏")
-                    .font(SoundHubFont.appFont(10))
-                    .foregroundStyle(Color.soundhubComment)
-            }
-            Spacer()
-            Image(systemName: enabled ? "checkmark.circle.fill" : "circle")
-                .font(.system(size: 19))
-                .foregroundStyle(enabled ? Color.soundhubHighlight : Color.soundhubComment.opacity(0.5))
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 9)
-        .background {
-            RoundedRectangle(cornerRadius: 13, style: .continuous)
-                .fill(Color.primary.opacity(enabled ? 0.06 : 0.03))
-        }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            if enabled && platformPrefs.enabledSearchProviders.count <= 1 { return }
-            SoundHubHaptics.select()
-            platformPrefs.set(provider, enabled: !enabled)
         }
     }
 
@@ -2913,7 +2829,7 @@ struct SettingsView: View {
                 Divider().opacity(0.2).padding(.leading, 46)
                 supportRow(icon: "trash.circle", title: "缓存清理") {
                     URLCache.shared.removeAllCachedResponses()
-                    ImageFileCache.removeAll()
+                    SoundHubImageFileCache.removeAll()
                     SoundHubHaptics.success()
                     ToastCenter.shared.show("缓存已清理")
                 }
