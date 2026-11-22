@@ -383,6 +383,31 @@ final class NetEaseAPI {
         return albums
     }
 
+    /// 搜索歌单（type=1000）
+    func searchPlaylists(keyword: String, limit: Int = 30, offset: Int = 0) async throws -> [Playlist] {
+        let json = try await request(
+            "/api/cloudsearch/pc",
+            payload: ["s": keyword, "type": 1000, "limit": limit, "offset": offset, "total": true],
+            crypto: "weapi"
+        )
+        let result = json["result"] as? [String: Any] ?? [:]
+        let list = result["playlists"] as? [[String: Any]] ?? []
+        var playlists: [Playlist] = []
+        var seen = Set<Int>()
+        for item in list {
+            guard let id = item["id"] as? Int, seen.insert(id).inserted else { continue }
+            let pic = item["coverImgUrl"] as? String ?? (item["picUrl"] as? String ?? "")
+            playlists.append(Playlist(
+                id: id,
+                name: item["name"] as? String ?? "",
+                coverURL: pic.isEmpty ? nil : URL(string: pic),
+                trackCount: item["trackCount"] as? Int ?? 0,
+                source: .netease
+            ))
+        }
+        return playlists
+    }
+
     // MARK: - 歌手主页
 
     /// 歌手热门歌曲（分页加载，避免接口单页最多返回 30 首）

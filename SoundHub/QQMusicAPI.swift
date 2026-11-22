@@ -320,6 +320,58 @@ final class QQMusicAPI {
         return []
     }
 
+    /// 搜索歌单：官网 songlist 搜索优先，失败回退旧搜索接口。
+    func searchPlaylists(keyword: String, limit: Int = 30) async throws -> [Playlist] {
+        let target = min(max(limit, 1), 30)
+        var components = URLComponents(string: "https://c.y.qq.com/soso/fcgi-bin/client_music_search_songlist")!
+        components.queryItems = [
+            URLQueryItem(name: "page_no", value: "0"),
+            URLQueryItem(name: "num_per_page", value: String(target)),
+            URLQueryItem(name: "format", value: "json"),
+            URLQueryItem(name: "query", value: keyword),
+            URLQueryItem(name: "remoteplace", value: "txt.yqq.playlist")
+        ]
+        if let url = components.url,
+           let json = try? await get(url.absoluteString, referer: "https://y.qq.com/portal/search.html") {
+            let playlists = Self.qqPlaylists(from: json, limit: target)
+            if !playlists.isEmpty { return playlists }
+        }
+        if let url = clientSearchURL(keyword: keyword, limit: target, type: 3),
+           let json = try? await get(url.absoluteString, referer: "https://y.qq.com/portal/player.html") {
+            let playlists = Self.qqPlaylists(from: json, limit: target)
+            if !playlists.isEmpty { return playlists }
+        }
+        return []
+    }
+
+    /// 歌单字段在不同 QQ 接口版本里位于不同节点，递归收集带歌单 ID 的字典。
+    private static func qqPlaylistItems(from value: Any) -> [[String: Any]] {
+        var result: [[String: Any]] = []
+        func walk(_ value: Any) {
+            if let dict = value as? [String: Any] {
+                let hasID = dict["dissid"] != nil || dict["diss_id"] != nil || dict["tid"] != nil || dict["listid"] != nil
+                let hasName = dict["dissname"] != nil || dict["diss_name"] != nil || dict["name"] != nil || dict["title"] != nil
+                if hasID && hasName { result.append(dict) }
+                for child in dict.values { walk(child) }
+            } else if let array = value as? [Any] {
+                for child in array { walk(child) }
+            }
+        }
+        walk(value)
+        return result
+    }
+
+    private static func qqPlaylists(from json: [String: Any], limit: Int) -> [Playlist] {
+        var seen = Set<Int>()
+        var playlists: [Playlist] = []
+        for item in qqPlaylistItems(from: json) {
+            guard let playlist = playlist(fromQQDiss: item), seen.insert(playlist.id).inserted else { continue }
+            playlists.append(playlist)
+            if playlists.count >= max(limit, 1) { break }
+        }
+        return playlists
+    }
+
     private func parseAlbumItems(_ items: [[String: Any]]) -> [Album] {
         var albums: [Album] = []
         for item in items {

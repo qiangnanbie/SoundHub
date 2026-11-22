@@ -318,6 +318,46 @@ final class KugouMusicAPI {
 
     /// 酷狗 iOS 综合搜索接口。该接口返回的结果比旧网页接口完整，
     /// 同时携带歌曲 hash、专辑、歌手、封面和权限字段。
+    /// 搜索歌单（酷狗 special 搜索）
+    func searchPlaylists(keyword: String, limit: Int = 40) async throws -> [Playlist] {
+        var components = URLComponents(string: "https://msearchretry.kugou.com/api/v3/search/special")!
+        components.queryItems = [
+            URLQueryItem(name: "keyword", value: keyword),
+            URLQueryItem(name: "page", value: "1"),
+            URLQueryItem(name: "pagesize", value: "\(min(max(limit, 1), 60))"),
+            URLQueryItem(name: "showtype", value: "10"),
+            URLQueryItem(name: "filter", value: "0"),
+            URLQueryItem(name: "version", value: "7910"),
+            URLQueryItem(name: "sver", value: "2")
+        ]
+        guard let url = components.url else { throw NetEaseError.unknown("酷狗歌单搜索地址无效") }
+        let json = try await getJSON(url, ua: Self.browserUA)
+        let data = json["data"] as? [String: Any] ?? [:]
+        let items = data["info"] as? [[String: Any]] ?? []
+        var result: [Playlist] = []
+        var seen = Set<Int>()
+        for item in items {
+            guard let id = Self.playlistID(item["specialid"] ?? item["specialId"]), id > 0, seen.insert(id).inserted else { continue }
+            let pic = item["imgurl"] as? String ?? (item["img"] as? String ?? "")
+            result.append(Playlist(
+                id: id,
+                name: item["specialname"] as? String ?? "未命名歌单",
+                coverURL: pic.isEmpty ? nil : URL(string: pic),
+                trackCount: item["songcount"] as? Int ?? 0,
+                source: .kugou
+            ))
+            if result.count >= max(limit, 1) { break }
+        }
+        return result
+    }
+
+    private static func playlistID(_ value: Any?) -> Int? {
+        if let int = value as? Int { return int }
+        if let string = value as? String { return Int(string) }
+        if let number = value as? NSNumber { return number.intValue }
+        return nil
+    }
+
     private func searchSongsComplete(keyword: String, limit: Int) async throws -> [Song] {
         var result: [Song] = []
         var seen = Set<String>()

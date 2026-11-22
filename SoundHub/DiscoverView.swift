@@ -94,6 +94,11 @@ struct DiscoverView: View {
     @State private var neteaseCat = "全部"
     /// 官方歌单分类列表
     @State private var playlistCats: [String] = []
+    /// 歌单广场搜索状态
+    @State private var playlistSearchText = ""
+    @State private var playlistSearchResults: [Playlist] = []
+    @State private var playlistSearchActive = false
+    @State private var playlistSearchLoading = false
 
     var body: some View {
         let _ = theme.accent
@@ -1045,9 +1050,72 @@ struct DiscoverView: View {
         return ["全部"] + Array(playlistCats.prefix(18))
     }
 
+    /// 歌单广场搜索框
+    private var playlistSearchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Color.soundhubComment)
+            TextField(soundhubLocalized("搜索歌单", "Search playlists"), text: $playlistSearchText)
+                .font(SoundHubFont.appFont(13))
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled(true)
+                .submitLabel(.search)
+                .onSubmit { Task { await runPlaylistSearch() } }
+            if playlistSearchLoading {
+                ProgressView().scaleEffect(0.6)
+            } else if playlistSearchActive || !playlistSearchText.isEmpty {
+                Button {
+                    SoundHubHaptics.tap()
+                    playlistSearchText = ""
+                    playlistSearchResults = []
+                    playlistSearchActive = false
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color.soundhubComment)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .background {
+            SoundHubGlass(shape: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+    }
+
+    @MainActor
+    private func runPlaylistSearch() async {
+        let keyword = playlistSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !keyword.isEmpty else {
+            playlistSearchActive = false
+            playlistSearchResults = []
+            return
+        }
+        playlistSearchActive = true
+        playlistSearchLoading = true
+        defer { playlistSearchLoading = false }
+        do {
+            let result: [Playlist]
+            switch source {
+            case .netease:
+                result = try await NetEaseAPI.shared.searchPlaylists(keyword: keyword, limit: 30)
+            case .qq:
+                result = try await QQMusicAPI.shared.searchPlaylists(keyword: keyword, limit: 30)
+            case .kugou:
+                result = try await KugouMusicAPI.shared.searchPlaylists(keyword: keyword, limit: 30)
+            }
+            playlistSearchResults = result
+        } catch {
+            playlistSearchResults = []
+        }
+    }
+
     private var personalizedSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             SectionHeader(title: playlistSectionTitle)
+            playlistSearchField
             if visiblePersonalizedPlaylists.isEmpty {
                 EmptyStateView(icon: "music.note.list", text: playlistEmptyText)
             } else if isNativeClean && !playlistsExpanded {
@@ -1151,6 +1219,11 @@ struct DiscoverView: View {
     }
 
     private var playlistEmptyText: String {
+        if playlistSearchActive {
+            return playlistSearchLoading
+                ? soundhubLocalized("正在搜索歌单…", "Searching playlists…")
+                : soundhubLocalized("没有找到相关歌单", "No playlists found")
+        }
         switch source {
         case .netease: return "推荐歌单暂时没有内容"
         case .qq: return "QQ音乐热门歌单暂未加载成功\n下拉刷新可重新获取"
@@ -1160,8 +1233,13 @@ struct DiscoverView: View {
 
     private var collapsedPlaylistCount: Int { 6 }
 
+    /// 歌单广场当前展示的数据源：搜索中展示结果，否则展示推荐歌单
+    private var playlistSquareData: [Playlist] {
+        playlistSearchActive ? playlistSearchResults : personalized
+    }
+
     private var visiblePersonalizedPlaylists: [Playlist] {
-        playlistsExpanded ? personalized : Array(personalized.prefix(collapsedPlaylistCount))
+        playlistsExpanded ? playlistSquareData : Array(playlistSquareData.prefix(collapsedPlaylistCount))
     }
 
     // MARK: - 动作
