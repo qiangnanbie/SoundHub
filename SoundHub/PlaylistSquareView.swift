@@ -75,23 +75,31 @@ struct PlaylistSquareView: View {
 
     private var providerPicker: some View {
         HStack(spacing: 8) {
-            ForEach(providers, id: \.self) { provider in
+            ForEach(providers) { provider in
                 Button {
                     guard source != provider else { return }
-                    SoundHubHaptics.select()
+                    SoundHubHaptics.tap()
                     source = provider
                     selectedCategory = "全部"
                     playlistCache = [:]
                     Task { await reload(force: true) }
                 } label: {
-                    Text(provider.displayName)
-                        .font(SoundHubFont.appFont(13, .semibold))
-                        .foregroundStyle(source == provider ? Color.soundhubHighlight : Color.soundhubComment)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 7)
-                        .background {
-                            Capsule().fill(Color.primary.opacity(source == provider ? 0.12 : 0.05))
+                    HStack(spacing: 6) {
+                        Image(systemName: provider.icon)
+                            .font(.system(size: 11, weight: .semibold))
+                        Text(LocalizedStringKey(provider.rawValue))
+                            .font(SoundHubFont.appFont(13, .semibold))
+                    }
+                    .foregroundStyle(source == provider ? Color.white : Color.soundhubComment)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 7)
+                    .background {
+                        if source == provider {
+                            Capsule().fill(provider.tint)
+                        } else {
+                            Capsule().fill(Color.primary.opacity(0.06))
                         }
+                    }
                 }
                 .buttonStyle(.plain)
             }
