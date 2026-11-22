@@ -133,6 +133,8 @@ final class DownloadManager {
                 lastError = NetEaseError.unknown("保存失败：\(error.localizedDescription)")
                 continue
             }
+            // 入库：复制一份到下载库，供「下载」Tab 展示（原临时文件仍交给分享面板）
+            _ = DownloadStore.shared.importFile(from: dest, song: song, qualityName: actualQuality.displayName, ext: ext)
             let downgraded = index > 0 || actualQuality != quality
             SoundHubLogger.shared.log(
                 "下载成功：\(song.name) 平台=\(song.source.rawValue) 请求音质=\(quality.rawValue) 实际音质=\(actualQuality.rawValue) 降级=\(downgraded ? "是" : "否") 地址=\(safeURLSummary(resolved.url))",

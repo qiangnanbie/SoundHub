@@ -5,6 +5,7 @@ enum RootTab: String, CaseIterable, Identifiable {
     case discover
     case search
     case library
+    case downloads
     case profile
 
     var id: String { rawValue }
@@ -14,6 +15,7 @@ enum RootTab: String, CaseIterable, Identifiable {
         case .discover: return "主页"
         case .search: return "搜索"
         case .library: return "音乐库"
+        case .downloads: return "下载"
         case .profile: return "我的"
         }
     }
@@ -23,6 +25,7 @@ enum RootTab: String, CaseIterable, Identifiable {
         case .discover: return "house.fill"
         case .search: return "magnifyingglass"
         case .library: return "music.note.list"
+        case .downloads: return "arrow.down.circle"
         case .profile: return "person.crop.circle"
         }
     }
@@ -94,6 +97,9 @@ struct RootView: View {
             LibraryView()
                 .tabItem { Label(tabLabelsVisible ? "音乐库" : "", systemImage: "music.note.list") }
                 .tag(RootTab.library)
+            DownloadView()
+                .tabItem { Label(tabLabelsVisible ? "下载" : "", systemImage: "arrow.down.circle") }
+                .tag(RootTab.downloads)
             ProfileView()
                 .tabItem { Label(tabLabelsVisible ? "我的" : "", systemImage: "person.crop.circle") }
                 .tag(RootTab.profile)
