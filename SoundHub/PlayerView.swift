@@ -100,6 +100,10 @@ struct PlayerView: View {
     @AppStorage("soundhub.lyricTiltY") private var lyricTiltY = 0
     /// 歌词进度偏移（秒）：歌词与音频不同步时手动校正，正数提前、负数延后
     @AppStorage("soundhub.lyricOffset") private var lyricOffset = 0.0
+    @AppStorage("soundhub.softwareVolume") private var softwareVolume = 1.0
+    @State private var showSoftwareVolumeSheet = false
+    @State private var showLyricOffsetSheet = false
+    @State private var showPlayerCoverPicker = false
     /// 歌词界面自定义背景
     @AppStorage("soundhub.lyricBackground.image") private var lyricBackgroundImagePath = ""
     @AppStorage("soundhub.lyricBackground.blur") private var lyricBackgroundBlur = 12.0
@@ -592,6 +596,28 @@ struct PlayerView: View {
                 .environmentObject(player)
                 .environmentObject(theme)
         }
+        .sheet(isPresented: $showSoftwareVolumeSheet) {
+            playerSliderSheet(
+                title: "软件音量",
+                value: Binding(get: { softwareVolume }, set: { softwareVolume = $0; player.setSoftwareVolume(Float($0)) }),
+                range: 0.1...1.0,
+                caption: "只影响 SoundHub 自身播放音量，不改系统音量"
+            )
+        }
+        .sheet(isPresented: $showLyricOffsetSheet) {
+            playerSliderSheet(
+                title: "歌词偏移",
+                value: $lyricOffset,
+                range: -5...5,
+                caption: "正数歌词提前，负数延后，单位秒"
+            )
+        }
+        .sheet(isPresented: $showPlayerCoverPicker) {
+            CustomCoverPicker { image in
+                guard let image, let coverURL = player.currentSong?.coverURL else { return }
+                try? CustomSongCoverStore.shared.setCover(image, for: coverURL)
+            }
+        }
         .sheet(isPresented: $showSleepTimer) { SleepTimerSheet().environmentObject(player) }
         .sheet(isPresented: $showAddToPlaylist) {
             if let song {
@@ -862,6 +888,18 @@ struct PlayerView: View {
                     showDownloadPicker = true
                 }
             }
+            moreActionRow("更换自定义封面", systemName: "photo") {
+                showMoreActions = false
+                showPlayerCoverPicker = true
+            }
+            moreActionRow("软件音量", systemName: "speaker.wave.2") {
+                showMoreActions = false
+                showSoftwareVolumeSheet = true
+            }
+            moreActionRow("歌词偏移", systemName: "text.alignleft") {
+                showMoreActions = false
+                showLyricOffsetSheet = true
+            }
             moreActionRow("播放器设置", systemName: "slider.horizontal.3") {
                 showMoreActions = false
                 openPlayerSettings()
@@ -874,6 +912,21 @@ struct PlayerView: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .soundhubCardShadow(radius: 14, y: 8)
+    }
+
+    private func playerSliderSheet(title: String, value: Binding<Double>, range: ClosedRange<Double>, caption: String) -> some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Text(LocalizedStringKey(title))
+                .font(SoundHubFont.appFont(17, .semibold))
+            Slider(value: value, in: range)
+                .tint(Color.soundhubHighlight)
+            Text(caption)
+                .font(SoundHubFont.appFont(12))
+                .foregroundStyle(Color.soundhubComment)
+            Spacer(minLength: 0)
+        }
+        .padding(22)
+
     }
 
     private func moreActionRow(_ title: String, systemName: String, action: @escaping () -> Void) -> some View {

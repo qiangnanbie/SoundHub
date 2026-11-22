@@ -76,6 +76,14 @@ final class PlayerManager: NSObject, ObservableObject {
     @Published var playCounts: [String: Int] = [:]
 
     private var player: AVPlayer?
+
+    /// 软件音量（0.1–1.0）：直接作用在 AVPlayer 上，不改系统音量
+    private(set) var softwareVolume: Float = 1.0
+
+    func setSoftwareVolume(_ value: Float) {
+        softwareVolume = min(max(value, 0), 1)
+        player?.volume = softwareVolume
+    }
     private var timeObserver: Any?
     private var endObserver: NSObjectProtocol?
     private var failureObserver: NSObjectProtocol?
@@ -1005,6 +1013,7 @@ final class PlayerManager: NSObject, ObservableObject {
             level: .debug
         )
         let player = AVPlayer(playerItem: item)
+        player.volume = softwareVolume
         // QQ CDN 返回的首包较小，避免 AVPlayer 为了预缓冲过久而表现为
         // “点击后没反应”；真正不可播放时仍由 item 失败回调触发音质降级。
         player.automaticallyWaitsToMinimizeStalling = false
