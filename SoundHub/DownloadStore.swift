@@ -1,4 +1,5 @@
 import SwiftUI
+import AVFoundation
 
 /// 已下载歌曲的元数据
 struct DownloadedTrack: Identifiable, Codable, Hashable {
@@ -63,6 +64,69 @@ final class DownloadStore: ObservableObject {
 
     func contains(song: Song) -> Bool {
         tracks.contains { $0.id == Self.identifier(for: song) }
+    }
+
+    func track(for song: Song) -> DownloadedTrack? {
+        tracks.first { $0.id == Self.identifier(for: song) }
+    }
+
+    /// 从文件 App 导入本地音频（复制进下载目录并读取元数据）
+    func importExternalAudio(from url: URL) -> DownloadedTrack? {
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+
+        let asset = AVURLAsset(url: url)
+        let seconds = CMTimeGetSeconds(asset.duration)
+        let duration = seconds.isFinite && seconds > 0 ? seconds : 0
+
+        var title = url.deletingPathExtension().lastPathComponent
+        var artist = ""
+        for item in asset.commonMetadata {
+            guard let key = item.commonKey?.rawValue else { continue }
+            if key == "title", let value = item.stringValue, !value.isEmpty { title = value }
+            if key == "artist", let value = item.stringValue, !value.isEmpty { artist = value }
+        }
+
+        let ext = url.pathExtension.isEmpty ? "m4a" : url.pathExtension.lowercased()
+        let stableID = Self.stableNumericID(url.lastPathComponent)
+        var dest = directory.appendingPathComponent("import-\(stableID).\(ext)")
+        var copied = false
+        DownloadLocation.shared.withDirectory { dir in
+            dest = dir.appendingPathComponent("import-\(stableID).\(ext)")
+            try? fileManager.removeItem(at: dest)
+            if (try? fileManager.copyItem(at: url, to: dest)) != nil { copied = true }
+        }
+        guard copied else { return nil }
+
+        let size = (try? fileManager.attributesOfItem(atPath: dest.path)[.size] as? NSNumber)?.int64Value ?? 0
+        let track = DownloadedTrack(
+            id: "local-\(stableID)",
+            songID: stableID,
+            sourceRaw: SongSource.netease.rawValue,
+            name: title,
+            artists: artist.isEmpty ? "本地文件" : artist,
+            album: "",
+            coverURLString: nil,
+            duration: duration,
+            fileName: dest.lastPathComponent,
+            fileSize: size,
+            qualityName: "本地文件",
+            addedAt: Date()
+        )
+        tracks.removeAll { $0.id == track.id }
+        tracks.insert(track, at: 0)
+        saveIndex()
+        return track
+    }
+
+    /// 由文件名生成稳定正数 ID
+    private static func stableNumericID(_ text: String) -> Int {
+        var hash: UInt64 = 0xcbf29ce484222325
+        for byte in text.utf8 {
+            hash ^= UInt64(byte)
+            hash = hash &* 0x100000001b3
+        }
+        return Int(hash % 900_000_000) + 1_000_000_000
     }
 
     @discardableResult

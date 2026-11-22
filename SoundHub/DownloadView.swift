@@ -9,10 +9,19 @@ struct DownloadView: View {
 
     private enum Segment: String, CaseIterable { case songs = "歌曲", files = "文件" }
 
+    private enum SortOption: String, CaseIterable {
+        case nameAsc = "名称 (A-Z)"
+        case nameDesc = "名称 (Z-A)"
+        case dateNewest = "下载时间 (最新)"
+        case dateOldest = "下载时间 (最旧)"
+        case artistAsc = "歌手 (A-Z)"
+    }
+
     @State private var segment: Segment = .songs
     @State private var searchText = ""
     @State private var editing = false
-    @State private var sortByNewest = true
+    @State private var sortOption: SortOption = .dateNewest
+    @State private var showAudioPicker = false
     @State private var scanResult = ""
     @State private var shareFile: ShareFileItem?
     @State private var showShareSheet = false
@@ -24,7 +33,13 @@ struct DownloadView: View {
         let base = keyword.isEmpty ? store.tracks : store.tracks.filter {
             $0.name.lowercased().contains(keyword) || $0.artists.lowercased().contains(keyword)
         }
-        return sortByNewest ? base : base.sorted { $0.name < $1.name }
+        switch sortOption {
+        case .nameAsc: return base.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        case .nameDesc: return base.sorted { $0.name.localizedStandardCompare($1.name) == .orderedDescending }
+        case .dateNewest: return base.sorted { $0.addedAt > $1.addedAt }
+        case .dateOldest: return base.sorted { $0.addedAt < $1.addedAt }
+        case .artistAsc: return base.sorted { $0.artists.localizedStandardCompare($1.artists) == .orderedAscending }
+        }
     }
 
     private var filteredFiles: [URL] {
@@ -55,6 +70,16 @@ struct DownloadView: View {
             .navigationBarHidden(true)
             .sheet(isPresented: $showShareSheet) {
                 if let shareFile { ShareSheet(items: [shareFile.url]) }
+            }
+            .sheet(isPresented: $showAudioPicker) {
+                AudioFilePicker { urls in
+                    guard !urls.isEmpty else { return }
+                    var imported = 0
+                    for url in urls where DownloadStore.shared.importExternalAudio(from: url) != nil {
+                        imported += 1
+                    }
+                    ToastCenter.shared.show(imported > 0 ? "已导入 \(imported) 首本地歌曲" : "导入失败")
+                }
             }
             .sheet(isPresented: $showFolderPicker) {
                 FolderPicker { url in
@@ -93,7 +118,7 @@ struct DownloadView: View {
                 .foregroundStyle(Color.soundhubLabel)
             Spacer()
             HStack(spacing: 8) {
-                circleButton("plus") { segment = .songs }
+                circleButton("plus") { showAudioPicker = true }
                 Button {
                     SoundHubHaptics.tap()
                     editing.toggle()
@@ -106,9 +131,25 @@ struct DownloadView: View {
                         .background(Capsule().fill(Color.primary.opacity(0.08)))
                 }
                 .buttonStyle(.plain)
-                circleButton("arrow.up.arrow.down") {
-                    sortByNewest.toggle()
-                    SoundHubHaptics.select()
+                Menu {
+                    ForEach(SortOption.allCases, id: \.self) { option in
+                        Button {
+                            SoundHubHaptics.select()
+                            sortOption = option
+                        } label: {
+                            if sortOption == option {
+                                Label(option.rawValue, systemImage: "checkmark")
+                            } else {
+                                Text(option.rawValue)
+                            }
+                        }
+                    }
+                } label: {
+                    Image(systemName: "arrow.up.arrow.down")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Color.soundhubLabel)
+                        .frame(width: 34, height: 34)
+                        .background(Circle().fill(Color.primary.opacity(0.08)))
                 }
             }
         }

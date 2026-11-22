@@ -472,6 +472,15 @@ final class PlayerManager: NSObject, ObservableObject {
     private func loadCurrent(resumeAt: Double? = nil, forceKugouStandard: Bool = false) {
         guard ensurePlaybackAllowed() else { return }
         guard let song = currentSong else { return }
+        // 已下载的歌曲优先播本地文件：省流量、离线可听
+        if let track = DownloadStore.shared.track(for: song) {
+            let localURL = DownloadStore.shared.fileURL(for: track)
+            if FileManager.default.fileExists(atPath: localURL.path) {
+                SoundHubLogger.shared.log("播放本地文件：\(song.name)", level: .info)
+                setupPlayer(url: localURL, resumeAt: resumeAt ?? 0)
+                return
+            }
+        }
         loadGeneration += 1
         let generation = loadGeneration
         thirdPartyRetryExcludedHostsBySong.removeValue(forKey: song.identityKey)
