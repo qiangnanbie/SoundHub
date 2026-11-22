@@ -3483,6 +3483,23 @@ struct LyricsSection: View {
     }
 
     /// Apple Music 风格渐隐：当前行最大最亮，已播放行与未播放行按距离逐层变暗变淡
+    /// 当前行若有逐字时间轴则走逐字渲染，否则保持整行渲染
+    @ViewBuilder
+    private func lyricRowText(line: LyricLine, font: Font, style: AnyShapeStyle, isCurrent: Bool) -> some View {
+        if isCurrent, let words = line.words, words.count > 1 {
+            KaraokeLyricText(
+                words: words,
+                time: LyricTiming.effectiveProgress(clock.progress, userOffset: Double(lyricOffset)),
+                font: font,
+                color: accent
+            )
+        } else {
+            Text(line.text.isEmpty ? " " : line.text)
+                .font(font)
+                .foregroundStyle(style)
+        }
+    }
+
     private func lyricRow(index: Int, line: LyricLine) -> some View {
         let playbackIndex = currentIndex ?? 0
         // 手动滚动时，以视口中心行为清晰度焦点；颜色和渐变仍只跟随实际播放行。
@@ -3514,9 +3531,7 @@ struct LyricsSection: View {
         let translationText = (isCurrent && showTranslation) ? line.translation : nil
 
         return VStack(alignment: alignment == .leading ? .leading : .center, spacing: 3) {
-            Text(line.text.isEmpty ? " " : line.text)
-                .font(lineFont)
-                .foregroundStyle(lineStyle)
+            lyricRowText(line: line, font: lineFont, style: lineStyle, isCurrent: isCurrent)
                 // 双层光晕：内层亮、外层宽，发光更明显
                 .shadow(
                     color: isCurrent ? glowColor.opacity(glowRadius > 0 ? 0.9 : 0) : .clear,

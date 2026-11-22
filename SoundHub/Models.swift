@@ -386,18 +386,36 @@ struct KugouTopInfo: Identifiable, Hashable {
     let coverURL: URL?
 }
 
+/// 逐字歌词的单个词/字，start/duration 单位为秒
+struct LyricWord: Hashable {
+    let text: String
+    let start: Double
+    let duration: Double
+}
+
+/// 逐字高亮进度计算
+enum LyricKaraokeTiming {
+    static func opacity(for word: LyricWord, at time: Double) -> Double {
+        let fraction = min(max((time - word.start) / max(word.duration, 0.001), 0), 1)
+        return 0.28 + fraction * 0.72
+    }
+}
+
 struct LyricLine: Identifiable, Hashable {
     let id: UUID
     let time: Double
     let text: String
     /// 歌词翻译（网易云 tlyric，可空）
     var translation: String?
+    /// 真实逐字时间轴；普通 LRC 为 nil
+    var words: [LyricWord]?
 
-    init(time: Double, text: String, translation: String? = nil) {
+    init(time: Double, text: String, translation: String? = nil, words: [LyricWord]? = nil) {
         self.id = UUID()
         self.time = time
         self.text = text
         self.translation = translation
+        self.words = words
     }
 }
 
@@ -424,9 +442,12 @@ enum LyricParser {
         var lines: [LyricLine] = []
         for line in raw.components(separatedBy: .newlines) {
             parseTimes(in: line).forEach { time in
-                let text = line.replacingOccurrences(of: #"\[\d{2}:\d{2}(\.\d{1,3})?\]"#, with: "", options: .regularExpression)
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                lines.append(LyricLine(time: max(0, time + offset), text: text))
+                let text = LyricParser.plainText(of: line)
+                lines.append(LyricLine(
+                    time: max(0, time + offset),
+                    text: text,
+                    words: LyricParser.wordTimings(in: line, lineStart: time + offset)
+                ))
             }
         }
         return lines.sorted { $0.time < $1.time }
@@ -441,6 +462,53 @@ enum LyricParser {
             return 0
         }
         return milliseconds / 1000.0
+    }
+
+    /// 去掉所有时间戳/词级标记后的纯文本
+    static func plainText(of line: String) -> String {
+        var text = line
+        for pattern in [
+            #"\(\d+,\d+(?:,\d+)?\)"#,
+            #"<\d+,\d+(?:,\d+)*>"#,
+            #"\[\d{1,3}:\d{2}(?:[.:]\d{1,3})?\]"#,
+            #"\[\d+,\d+(?:,\d+)*\]"#
+        ] {
+            text = text.replacingOccurrences(of: pattern, with: "", options: .regularExpression)
+        }
+        return text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// 解析词级时间轴，支持 YRC `(start,dur,0)字`、QRC/KRC `<start,dur,0>字` 两种标记
+    static func wordTimings(in line: String, lineStart: Double) -> [LyricWord]? {
+        let patterns = [
+            #"\((\d+),(\d+)(?:,\d+)?\)([^\(<]*)"#,
+            #"<(\d+),(\d+)(?:,\d+)*>([^<]*)"#
+        ]
+        for pattern in patterns {
+            guard let regex = try? NSRegularExpression(pattern: pattern) else { continue }
+            let full = NSRange(line.startIndex..., in: line)
+            var words: [LyricWord] = []
+            regex.enumerateMatches(in: line, options: [], range: full) { match, _, _ in
+                guard let match,
+                      let sRange = Range(match.range(at: 1), in: line),
+                      let dRange = Range(match.range(at: 2), in: line),
+                      let tRange = Range(match.range(at: 3), in: line) else { return }
+                let startMs = Double(line[sRange]) ?? 0
+                let durMs = Double(line[dRange]) ?? 0
+                let text = String(line[tRange])
+                guard !text.isEmpty else { return }
+                words.append(LyricWord(text: text, start: startMs / 1000.0, duration: durMs / 1000.0))
+            }
+            if !words.isEmpty {
+                // 词级时间戳本身是绝对时间；若全部早于行首则视为相对时间
+                let earliest = words.map(\.start).min() ?? 0
+                if earliest < lineStart - 0.05 {
+                    return words.map { LyricWord(text: $0.text, start: lineStart + $0.start, duration: $0.duration) }
+                }
+                return words
+            }
+        }
+        return nil
     }
 
     private static func parseTimes(in line: String) -> [Double] {
