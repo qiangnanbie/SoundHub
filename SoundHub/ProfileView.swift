@@ -1150,6 +1150,7 @@ struct SettingsView: View {
     @State private var showDisclaimerSheet = false
     @State private var showEnvironmentSheet = false
     @State private var sourceQualityExpanded = false
+    @State private var showInterfaceSheet = false
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("soundhub.themeMode") private var themeModeRaw = SoundHubThemeMode.system.rawValue
@@ -1171,6 +1172,7 @@ struct SettingsView: View {
     @AppStorage(SoundHubHaptics.enabledKey) private var hapticsEnabled = true
     @AppStorage("soundhub.playback.autoResumeLast") private var autoResumeLastPlayback = false
     @AppStorage("soundhub.labelColorHex") private var labelColorHex = ""
+    @AppStorage("soundhub.commentColorHex") private var commentColorHex = ""
     @AppStorage("soundhub.homeGreetingText") private var homeGreetingText = ""
     @AppStorage("soundhub.homeGreetingSize") private var homeGreetingSize = 30.0
     @AppStorage("soundhub.homeGreetingHeight") private var homeGreetingHeight = 0.0
@@ -1548,6 +1550,9 @@ struct SettingsView: View {
         .sheet(isPresented: $showLogViewer) {
             LogViewerSheet(importedText: nil)
                 .environmentObject(theme)
+        }
+        .sheet(isPresented: $showInterfaceSheet) {
+            interfaceAppearanceSheet
         }
         .sheet(isPresented: $showFeedbackSheet) {
             infoSheet(title: "问题反馈", body: "遇到问题时请附上复现步骤与截图，反馈到 GitHub Issues：\nhttps://github.com/qiangnanbie/SoundHub/issues")
@@ -1927,6 +1932,70 @@ struct SettingsView: View {
                         .font(SoundHubFont.appFont(12))
                         .foregroundStyle(Color.soundhubComment)
                 }
+
+                    Divider().overlay(Color.soundhubComment.opacity(0.15))
+
+                    HStack {
+                        Image(systemName: "drop.fill")
+                            .font(.system(size: 14))
+                            .foregroundStyle(Color.soundhubAmber)
+                            .frame(width: 28)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("液态容器颜色")
+                                .font(SoundHubFont.appFont(15))
+                                .foregroundStyle(Color.soundhubLabel)
+                            Text("只影响自定义液态容器，系统原生玻璃不变")
+                                .font(SoundHubFont.appFont(10))
+                                .foregroundStyle(Color.soundhubComment)
+                        }
+                        Spacer()
+                        ColorPicker("", selection: Binding(
+                            get: { Color(hex: liquidTintHex) ?? Color.white },
+                            set: { liquidTintHex = $0.hexString }
+                        ))
+                        .labelsHidden()
+                    }
+                    HStack(spacing: 12) {
+                        Button {
+                            liquidTintHex = ""
+                            SoundHubHaptics.select()
+                        } label: {
+                            Text("恢复默认")
+                                .font(SoundHubFont.appFont(13, .medium))
+                                .foregroundStyle(Color.soundhubAmber)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background { SoundHubSurface(shape: Capsule()) }
+                        }
+                        .buttonStyle(.plain)
+                        Spacer()
+                        Text(liquidTintHex.isEmpty ? "默认清透" : "已自定义")
+                            .font(SoundHubFont.appFont(12))
+                            .foregroundStyle(Color.soundhubComment)
+                    }
+
+                    Divider().overlay(Color.soundhubComment.opacity(0.15))
+
+                    Button {
+                        SoundHubHaptics.tap()
+                        showInterfaceSheet = true
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "textformat.size")
+                                .font(.system(size: 14))
+                                .foregroundStyle(Color.soundhubAmber)
+                                .frame(width: 28)
+                            Text("界面、字体与静态壁纸")
+                                .font(SoundHubFont.appFont(15))
+                                .foregroundStyle(Color.soundhubLabel)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(Color.soundhubComment.opacity(0.6))
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
 
                     Divider().overlay(Color.soundhubComment.opacity(0.15))
 
@@ -2455,8 +2524,9 @@ struct SettingsView: View {
                     .toggleStyle(.switch)
                     .tint(Color.soundhubAmber)
 
-                    qualityChips(title: "Wi-Fi", selection: $wifiQualityRaw)
-                    qualityChips(title: "蜂窝数据", selection: $cellularQualityRaw)
+                    qualityChips(title: "Wi-Fi（官方音质）", selection: $wifiQualityRaw)
+                    thirdPartyQualityChips()
+                    qualityChips(title: "蜂窝数据（官方音质）", selection: $cellularQualityRaw)
 
                     Toggle(isOn: $autoSwitchPlatform) {
                         VStack(alignment: .leading, spacing: 2) {
@@ -2514,6 +2584,36 @@ struct SettingsView: View {
                         let selected = selection.wrappedValue == quality.rawValue
                         Button {
                             selection.wrappedValue = quality.rawValue
+                            SoundHubHaptics.select()
+                        } label: {
+                            Text(quality.displayName)
+                                .font(SoundHubFont.appFont(12, .medium))
+                                .foregroundStyle(selected ? Color.white : Color.soundhubLabel)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background {
+                                    Capsule().fill(selected ? Color.soundhubHighlight : Color.primary.opacity(0.06))
+                                }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
+
+    /// 第三方音源音质档：由已导入音源实际支持的档位动态生成
+    private func thirdPartyQualityChips() -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("第三方音源")
+                .font(SoundHubFont.appFont(12, .semibold))
+                .foregroundStyle(Color.soundhubLabel)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(thirdPartyAudioQualityOptions) { quality in
+                        let selected = thirdPartyAudioQualitySelection.wrappedValue == quality
+                        Button {
+                            thirdPartyAudioQualitySelection.wrappedValue = quality
                             SoundHubHaptics.select()
                         } label: {
                             Text(quality.displayName)
@@ -3301,6 +3401,121 @@ struct SettingsView: View {
             .padding(14)
             .background {
                 SoundHubGlass(shape: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            }
+        }
+    }
+
+    /// 界面、字体与静态壁纸子页
+    private var interfaceAppearanceSheet: some View {
+        SoundHubNavigationStack {
+            ZStack {
+                GlassBackdrop(customColor: theme.backgroundSyncAll ? theme.customBackground : nil)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack {
+                                Image(systemName: "textformat")
+                                    .foregroundStyle(Color.soundhubAmber)
+                                Text("全局字体")
+                                    .font(SoundHubFont.appFont(15, .semibold))
+                                    .foregroundStyle(Color.soundhubLabel)
+                                Spacer()
+                                Text(FontManager.installedFontName ?? "系统默认")
+                                    .font(SoundHubFont.appFont(11))
+                                    .foregroundStyle(Color.soundhubComment)
+                            }
+                            HStack(spacing: 12) {
+                                Button("上传字体") { showFontImporter = true }
+                                    .font(SoundHubFont.appFont(13, .medium))
+                                    .foregroundStyle(Color.soundhubAmber)
+                                    .padding(.horizontal, 12).padding(.vertical, 6)
+                                    .background { SoundHubSurface(shape: Capsule()) }
+                                    .buttonStyle(.plain)
+                                Button("恢复默认字体") {
+                                    FontManager.clear()
+                                    ToastCenter.shared.show("已恢复系统默认字体")
+                                }
+                                .font(SoundHubFont.appFont(13, .medium))
+                                .foregroundStyle(Color.soundhubAmber)
+                                .padding(.horizontal, 12).padding(.vertical, 6)
+                                .background { SoundHubSurface(shape: Capsule()) }
+                                .buttonStyle(.plain)
+                                Spacer()
+                            }
+                        }
+                        .padding(14)
+                        .background { SoundHubGlass(shape: RoundedRectangle(cornerRadius: 18, style: .continuous)) }
+
+                        VStack(spacing: 12) {
+                            HStack {
+                                Text("主文字颜色")
+                                    .font(SoundHubFont.appFont(14))
+                                    .foregroundStyle(Color.soundhubLabel)
+                                Spacer()
+                                ColorPicker("", selection: Binding(
+                                    get: { Color(hex: labelColorHex) ?? Color.soundhubLabel },
+                                    set: { labelColorHex = $0.hexString; theme.objectWillChange.send() }
+                                )).labelsHidden()
+                            }
+                            HStack {
+                                Text("注释文字颜色")
+                                    .font(SoundHubFont.appFont(14))
+                                    .foregroundStyle(Color.soundhubLabel)
+                                Spacer()
+                                ColorPicker("", selection: Binding(
+                                    get: { Color(hex: commentColorHex) ?? Color.soundhubComment },
+                                    set: { commentColorHex = $0.hexString; theme.objectWillChange.send() }
+                                )).labelsHidden()
+                            }
+                            Toggle(isOn: Binding(
+                                get: { theme.backgroundSyncAll },
+                                set: { theme.setBackgroundSyncAll($0) }
+                            )) {
+                                Text("同步到搜索 / 音乐库 / 我的")
+                                    .font(SoundHubFont.appFont(14))
+                                    .foregroundStyle(Color.soundhubLabel)
+                            }
+                            .toggleStyle(.switch)
+                            .tint(Color.soundhubAmber)
+                            HStack {
+                                Text("主页壁纸模糊度")
+                                    .font(SoundHubFont.appFont(14))
+                                    .foregroundStyle(Color.soundhubLabel)
+                                Slider(value: $homeWallpaperBlur, in: 0...24, step: 1)
+                                    .tint(Color.soundhubAmber)
+                            }
+                            HStack(spacing: 12) {
+                                Button("上传壁纸") { showWallpaperPicker = true }
+                                    .font(SoundHubFont.appFont(13, .medium))
+                                    .foregroundStyle(Color.soundhubAmber)
+                                    .padding(.horizontal, 12).padding(.vertical, 6)
+                                    .background { SoundHubSurface(shape: Capsule()) }
+                                    .buttonStyle(.plain)
+                                Button("清除当前背景") {
+                                    theme.clearBackgroundImage(for: colorScheme == .dark ? .dark : .light)
+                                    ToastCenter.shared.show("已清除当前背景")
+                                }
+                                .font(SoundHubFont.appFont(13, .medium))
+                                .foregroundStyle(Color.soundhubAmber)
+                                .padding(.horizontal, 12).padding(.vertical, 6)
+                                .background { SoundHubSurface(shape: Capsule()) }
+                                .buttonStyle(.plain)
+                                Spacer()
+                            }
+                        }
+                        .padding(14)
+                        .background { SoundHubGlass(shape: RoundedRectangle(cornerRadius: 18, style: .continuous)) }
+                        Spacer(minLength: 0)
+                    }
+                    .padding(16)
+                }
+            }
+            .navigationTitle("界面、字体与静态壁纸")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("完成") { showInterfaceSheet = false }
+                }
             }
         }
     }
