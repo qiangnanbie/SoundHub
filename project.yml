@@ -22,7 +22,7 @@ targets:
         # 自动签名时把你的 10 位 Team ID 填这里（developer.apple.com → Membership）
         # DEVELOPMENT_TEAM: XXXXXXXXXX
         MARKETING_VERSION: "1.8.8"
-        CURRENT_PROJECT_VERSION: "54"
+        CURRENT_PROJECT_VERSION: "55"
         TARGETED_DEVICE_FAMILY: "1"
         SWIFT_OBJC_BRIDGING_HEADER: SoundHub/SoundHub-Bridging-Header.h
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
