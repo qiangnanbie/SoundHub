@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import CoreImage.CIFilterBuiltins
 
 // MARK: - 工具
@@ -493,6 +494,13 @@ struct CoverImage: View {
             .fill(Color.soundhubGlassFill)
             .frame(width: size, height: size)
             .overlay {
+                if let customImage = customCoverImage {
+                    Image(uiImage: customImage)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: size, height: size)
+                        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                } else {
                 AsyncImage(url: url) { phase in
                     switch phase {
                     case .success(let image):
@@ -517,8 +525,13 @@ struct CoverImage: View {
                 }
                 .frame(width: size, height: size)
                 .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                }
             }
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+    }
+
+    private var customCoverImage: UIImage? {
+        CustomSongCoverStore.shared.image(for: url)
     }
 
     private var placeholderIcon: some View {

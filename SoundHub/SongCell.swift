@@ -20,6 +20,7 @@ struct SongCell: View {
     var onTap: (() -> Void)?
 
     @State private var showAddToPlaylist = false
+    @State private var showCoverPicker = false
     @State private var shareFile: ShareFileItem?
     @State private var appeared = false
 
@@ -90,6 +91,20 @@ struct SongCell: View {
             } label: {
                 Label("添加到歌单", systemImage: "text.badge.plus")
             }
+            if song.coverURL != nil {
+                Button {
+                    showCoverPicker = true
+                } label: {
+                    Label("自定义封面", systemImage: "photo")
+                }
+                if CustomSongCoverStore.shared.hasCover(for: song.coverURL) {
+                    Button(role: .destructive) {
+                        CustomSongCoverStore.shared.removeCover(for: song.coverURL)
+                    } label: {
+                        Label("恢复默认封面", systemImage: "arrow.uturn.backward")
+                    }
+                }
+            }
             if downloadFeatureUnlocked {
                 Button {
                     Task { await downloadSong() }
@@ -109,6 +124,12 @@ struct SongCell: View {
                 } label: {
                     Label("立即播放", systemImage: "play.fill")
                 }
+            }
+        }
+        .sheet(isPresented: $showCoverPicker) {
+            CustomCoverPicker { image in
+                guard let image, let coverURL = song.coverURL else { return }
+                try? CustomSongCoverStore.shared.setCover(image, for: coverURL)
             }
         }
         .sheet(isPresented: $showAddToPlaylist) {
