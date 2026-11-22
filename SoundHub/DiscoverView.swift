@@ -103,6 +103,7 @@ struct DiscoverView: View {
     @State private var playlistSearchResults: [Playlist] = []
     @State private var playlistSearchActive = false
     @State private var playlistSearchLoading = false
+    @State private var showPlaylistSquare = false
 
     var body: some View {
         let _ = theme.accent
@@ -226,6 +227,12 @@ struct DiscoverView: View {
                 guard !homeRenderingPaused else { return }
                 guard platformPrefs.isEnabled(SearchProvider.kugou) else { return }
                 reloadAfterLoginUpdate(.kugou)
+            }
+            .sheet(isPresented: $showPlaylistSquare) {
+                PlaylistSquareView()
+                    .environmentObject(player)
+                    .environmentObject(auth)
+                    .environmentObject(theme)
             }
             .sheet(item: $albumSheet) { album in
                 AlbumDetailView(album: album)
@@ -1202,7 +1209,10 @@ struct DiscoverView: View {
 
     private var personalizedSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SectionHeader(title: playlistSectionTitle)
+            SectionHeader(title: playlistSectionTitle, trailing: soundhubLocalized("全部", "All")) {
+                SoundHubHaptics.tap()
+                showPlaylistSquare = true
+            }
             playlistSearchField
             if visiblePersonalizedPlaylists.isEmpty {
                 EmptyStateView(icon: "music.note.list", text: playlistEmptyText)
