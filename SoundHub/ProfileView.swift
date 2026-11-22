@@ -652,7 +652,7 @@ struct ProfileView: View {
     private var communityCard: some View {
         Button {
             SoundHubHaptics.tap()
-            if let url = URL(string: "https://t.me/+k8oYhsIU4sgzOTM1") {
+            if let url = URL(string: "https://t.me/SoundHub888") {
                 UIApplication.shared.open(url)
             }
         } label: {
