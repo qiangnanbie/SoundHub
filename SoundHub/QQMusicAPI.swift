@@ -1509,6 +1509,74 @@ final class QQMusicAPI {
         return result
     }
 
+    /// 新碟上架（musicu newalbum.NewAlbumServer）
+    func newAlbums(limit: Int = 18, offset: Int = 0) async throws -> [Album] {
+        let payload: [String: Any] = [
+            "comm": ["ct": 24, "cv": 0],
+            "new_album": [
+                "module": "newalbum.NewAlbumServer",
+                "method": "get_new_album_info",
+                "param": ["area": 1, "start": max(0, offset), "num": limit]
+            ]
+        ]
+        let json = try await musicu(payload, timeout: 12)
+        let data = (json["new_album"] as? [String: Any])?["data"] as? [String: Any] ?? [:]
+        let list = data["albums"] as? [[String: Any]] ?? (data["list"] as? [[String: Any]] ?? [])
+        var result: [Album] = []
+        var seen = Set<String>()
+        for item in list {
+            let mid = item["mid"] as? String ?? ""
+            let id = (item["id"] as? Int).map(String.init) ?? mid
+            guard !id.isEmpty, seen.insert(id).inserted else { continue }
+            let singers = item["singers"] as? [[String: Any]] ?? []
+            let artist = singers.compactMap { $0["name"] as? String }.joined(separator: " / ")
+            result.append(Album(
+                id: "qq-\(id)",
+                name: item["name"] as? String ?? "",
+                artistName: artist,
+                coverURL: mid.isEmpty ? nil : URL(string: "https://y.qq.com/music/photo_new/T002R300x300M000\(mid).jpg"),
+                source: .qq,
+                trackCount: nil
+            ))
+            if result.count >= max(limit, 1) { break }
+        }
+        return result
+    }
+
+    /// 热门歌手（musicu Music.SingerListServer）
+    func topArtists(limit: Int = 18, offset: Int = 0) async throws -> [Artist] {
+        let page = max(1, offset / 80 + 1)
+        let payload: [String: Any] = [
+            "comm": ["ct": 24, "cv": 0],
+            "singerList": [
+                "module": "Music.SingerListServer",
+                "method": "get_singer_list",
+                "param": [
+                    "area": -100, "sex": -100, "genre": -100, "index": -100,
+                    "sin": max(0, offset), "cur_page": page
+                ]
+            ]
+        ]
+        let json = try await musicu(payload, timeout: 12)
+        let data = (json["singerList"] as? [String: Any])?["data"] as? [String: Any] ?? [:]
+        let list = data["singerlist"] as? [[String: Any]] ?? []
+        var result: [Artist] = []
+        var seen = Set<String>()
+        for item in list {
+            let mid = item["singer_mid"] as? String ?? (item["singerMid"] as? String ?? "")
+            let name = item["singer_name"] as? String ?? (item["singerName"] as? String ?? "")
+            guard !mid.isEmpty, !name.isEmpty, seen.insert(mid).inserted else { continue }
+            result.append(Artist(
+                id: "qq-\(mid)",
+                name: name,
+                coverURL: URL(string: "https://y.qq.com/music/photo_new/T001R300x300M000\(mid).jpg"),
+                source: .qq
+            ))
+            if result.count >= max(limit, 1) { break }
+        }
+        return result
+    }
+
     /// QQ 官网首页热门歌单。
     /// 官网首页会把这组数据放在 SSR 的 __INITIAL_DATA__.hotRecommend 中，
     /// 比旧的 RecommendPlaylist musicu 接口更接近官网实际展示内容。

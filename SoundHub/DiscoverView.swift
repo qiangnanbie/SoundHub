@@ -80,6 +80,10 @@ struct DiscoverView: View {
 
     @State private var qqTopLists: [QQTopInfo] = []
     @State private var kugouTopLists: [KugouTopInfo] = []
+    @State private var newAlbums: [Album] = []
+    @State private var topArtists: [Artist] = []
+    @State private var albumSheet: Album?
+    @State private var artistSheet: Artist?
     /// 排行榜展开状态：收起显示前 3，展开显示前 10
     @State private var ranksExpanded = false
     /// 歌单广场展开状态：收起显示前 6，展开显示全部
@@ -149,6 +153,14 @@ struct DiscoverView: View {
                                     if source == .qq || !personalized.isEmpty {
                                         personalizedSection.sectionEntrance(delay: 0.16)
                                     }
+                                case "新碟上架":
+                                    if !newAlbums.isEmpty {
+                                        newAlbumsSection.sectionEntrance(delay: 0.24)
+                                    }
+                                case "歌手":
+                                    if !topArtists.isEmpty {
+                                        artistsSection.sectionEntrance(delay: 0.32)
+                                    }
                                 default:
                                     EmptyView()
                                 }
@@ -214,6 +226,12 @@ struct DiscoverView: View {
                 guard !homeRenderingPaused else { return }
                 guard platformPrefs.isEnabled(SearchProvider.kugou) else { return }
                 reloadAfterLoginUpdate(.kugou)
+            }
+            .sheet(item: $albumSheet) { album in
+                AlbumDetailView(album: album)
+            }
+            .sheet(item: $artistSheet) { artist in
+                ArtistHomeSheet(artist: artist)
             }
             .sheet(isPresented: $showSectionSort) {
                 SectionOrderSheet(
@@ -1050,6 +1068,76 @@ struct DiscoverView: View {
         return ["全部"] + Array(playlistCats.prefix(18))
     }
 
+    // MARK: - 新碟与歌手
+
+    private var newAlbumsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionHeader(title: soundhubLocalized("新碟上架", "New Releases"))
+            if newAlbums.isEmpty {
+                EmptyStateView(icon: "square.stack", text: soundhubLocalized("新碟暂时没有内容", "No new releases"))
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    LazyHStack(spacing: 14) {
+                        ForEach(newAlbums) { (album: Album) in
+                            Button {
+                                SoundHubHaptics.tap()
+                                albumSheet = album
+                            } label: {
+                                VStack(alignment: .leading, spacing: 7) {
+                                    CoverImage(url: album.coverURL, size: 124, cornerRadius: 6)
+                                    Text(album.name)
+                                        .font(SoundHubFont.appFont(12, .semibold))
+                                        .foregroundStyle(Color.soundhubLabel)
+                                        .lineLimit(1)
+                                        .frame(width: 124, alignment: .leading)
+                                    Text(album.artistName.isEmpty ? soundhubLocalized("未知歌手", "Unknown artist") : album.artistName)
+                                        .font(SoundHubFont.appFont(11))
+                                        .foregroundStyle(Color.soundhubComment)
+                                        .lineLimit(1)
+                                        .frame(width: 124, alignment: .leading)
+                                }
+                            }
+                            .buttonStyle(GlassPressButtonStyle(scale: 0.95))
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+            }
+        }
+    }
+
+    private var artistsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionHeader(title: soundhubLocalized("歌手", "Artists"))
+            if topArtists.isEmpty {
+                EmptyStateView(icon: "person.2", text: soundhubLocalized("暂无音乐人", "No artists available"))
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    LazyHStack(spacing: 14) {
+                        ForEach(topArtists) { (artist: Artist) in
+                            Button {
+                                SoundHubHaptics.tap()
+                                artistSheet = artist
+                            } label: {
+                                VStack(spacing: 8) {
+                                    CoverImage(url: artist.coverURL, size: 88, cornerRadius: 44)
+                                        .clipShape(Circle())
+                                    Text(artist.name)
+                                        .font(SoundHubFont.appFont(12, .medium))
+                                        .foregroundStyle(Color.soundhubLabel)
+                                        .lineLimit(1)
+                                        .frame(width: 88)
+                                }
+                            }
+                            .buttonStyle(GlassPressButtonStyle(scale: 0.95))
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+            }
+        }
+    }
+
     /// 歌单广场搜索框
     private var playlistSearchField: some View {
         HStack(spacing: 8) {
@@ -1414,6 +1502,8 @@ struct DiscoverView: View {
             snapshot.dailySongs = dr
             snapshot.qqTopLists = tl
             snapshot.personalized = pp
+            snapshot.newAlbums = (try? await QQMusicAPI.shared.newAlbums(limit: 18)) ?? []
+            snapshot.topArtists = (try? await QQMusicAPI.shared.topArtists(limit: 18)) ?? []
         case .netease:
             async let a = NetEaseAPI.shared.topLists()
             async let b = NetEaseAPI.shared.dailyRecommend()
@@ -1422,6 +1512,8 @@ struct DiscoverView: View {
             snapshot.topLists = tl
             snapshot.dailySongs = dr
             snapshot.personalized = pp
+            snapshot.newAlbums = (try? await NetEaseAPI.shared.newAlbums(limit: 18)) ?? []
+            snapshot.topArtists = (try? await NetEaseAPI.shared.topArtists(limit: 18)) ?? []
         case .kugou:
             async let songs = loadKugouDailySongs(limit: 30)
             async let ranks = KugouMusicAPI.shared.topLists(limit: 10)
@@ -1430,6 +1522,8 @@ struct DiscoverView: View {
             snapshot.dailySongs = daily
             snapshot.kugouTopLists = top
             snapshot.personalized = pp
+            snapshot.newAlbums = (try? await KugouMusicAPI.shared.newAlbums(limit: 18)) ?? []
+            snapshot.topArtists = (try? await KugouMusicAPI.shared.topArtists(limit: 18)) ?? []
         }
         return snapshot
     }
@@ -1448,11 +1542,14 @@ struct DiscoverView: View {
         personalized = snapshot.personalized
         qqTopLists = snapshot.qqTopLists
         kugouTopLists = snapshot.kugouTopLists
+        newAlbums = snapshot.newAlbums
+        topArtists = snapshot.topArtists
     }
 
     private var hasAnyData: Bool {
         !dailySongs.isEmpty || !topLists.isEmpty || !personalized.isEmpty
             || !qqTopLists.isEmpty || !kugouTopLists.isEmpty
+            || !newAlbums.isEmpty || !topArtists.isEmpty
     }
 }
 

@@ -13,11 +13,14 @@ final class DiscoverCache {
         var personalized: [Playlist] = []
         var qqTopLists: [QQTopInfo] = []
         var kugouTopLists: [KugouTopInfo] = []
+        var newAlbums: [Album] = []
+        var topArtists: [Artist] = []
         var savedAt: Date = .distantPast
 
         var isEmpty: Bool {
             dailySongs.isEmpty && topLists.isEmpty && personalized.isEmpty
                 && qqTopLists.isEmpty && kugouTopLists.isEmpty
+                && newAlbums.isEmpty && topArtists.isEmpty
         }
     }
 

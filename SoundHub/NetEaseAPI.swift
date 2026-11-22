@@ -408,6 +408,50 @@ final class NetEaseAPI {
         return playlists
     }
 
+    /// 新碟上架
+    func newAlbums(limit: Int = 18, offset: Int = 0) async throws -> [Album] {
+        let json = try await request(
+            "/api/album/new",
+            payload: ["area": "ALL", "limit": limit, "offset": offset, "total": true],
+            crypto: "weapi"
+        )
+        let list = json["albums"] as? [[String: Any]] ?? []
+        return list.compactMap { item in
+            guard let id = item["id"] as? Int else { return nil }
+            let pic = item["picUrl"] as? String ?? ""
+            let artist = (item["artist"] as? [String: Any])?["name"] as? String
+                ?? ((item["artists"] as? [[String: Any]])?.first?["name"] as? String ?? "")
+            return Album(
+                id: "netease-\(id)",
+                name: item["name"] as? String ?? "",
+                artistName: artist,
+                coverURL: pic.isEmpty ? nil : URL(string: pic),
+                source: .netease,
+                trackCount: item["size"] as? Int
+            )
+        }
+    }
+
+    /// 热门歌手
+    func topArtists(limit: Int = 18, offset: Int = 0) async throws -> [Artist] {
+        let json = try await request(
+            "/api/top/artists",
+            payload: ["limit": limit, "offset": offset, "total": true],
+            crypto: "weapi"
+        )
+        let list = json["artists"] as? [[String: Any]] ?? []
+        return list.compactMap { item in
+            guard let id = item["id"] as? Int else { return nil }
+            let pic = item["picUrl"] as? String ?? (item["img1v1Url"] as? String ?? "")
+            return Artist(
+                id: "netease-\(id)",
+                name: item["name"] as? String ?? "",
+                coverURL: pic.isEmpty ? nil : URL(string: pic),
+                source: .netease
+            )
+        }
+    }
+
     // MARK: - 歌手主页
 
     /// 歌手热门歌曲（分页加载，避免接口单页最多返回 30 首）

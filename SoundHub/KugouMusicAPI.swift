@@ -358,6 +358,68 @@ final class KugouMusicAPI {
         return nil
     }
 
+    /// 新碟上架（酷狗 album/list）
+    func newAlbums(limit: Int = 18) async throws -> [Album] {
+        var components = URLComponents(string: "http://mobilecdn.kugou.com/api/v3/album/list")!
+        components.queryItems = [
+            URLQueryItem(name: "page", value: "1"),
+            URLQueryItem(name: "pagesize", value: "\(min(max(limit, 1), 60))"),
+            URLQueryItem(name: "plat", value: "0"),
+            URLQueryItem(name: "version", value: "8000")
+        ]
+        guard let url = components.url else { throw NetEaseError.unknown("酷狗新碟地址无效") }
+        let json = try await getJSON(url, ua: Self.browserUA)
+        let data = json["data"] as? [String: Any] ?? [:]
+        let list = data["info"] as? [[String: Any]] ?? []
+        var result: [Album] = []
+        var seen = Set<Int>()
+        for item in list {
+            guard let id = Self.playlistID(item["albumid"]), id > 0, seen.insert(id).inserted else { continue }
+            let pic = item["imgurl"] as? String ?? (item["img"] as? String ?? "")
+            result.append(Album(
+                id: "kugou-\(id)",
+                name: item["albumname"] as? String ?? "",
+                artistName: item["singername"] as? String ?? "",
+                coverURL: pic.isEmpty ? nil : URL(string: pic),
+                source: .kugou,
+                trackCount: item["songcount"] as? Int
+            ))
+            if result.count >= max(limit, 1) { break }
+        }
+        return result
+    }
+
+    /// 热门歌手（酷狗 singer/list）
+    func topArtists(limit: Int = 18) async throws -> [Artist] {
+        var components = URLComponents(string: "http://mobilecdn.kugou.com/api/v3/singer/list")!
+        components.queryItems = [
+            URLQueryItem(name: "page", value: "1"),
+            URLQueryItem(name: "pagesize", value: "\(min(max(limit, 1), 60))"),
+            URLQueryItem(name: "plat", value: "0"),
+            URLQueryItem(name: "version", value: "8000")
+        ]
+        guard let url = components.url else { throw NetEaseError.unknown("酷狗歌手地址无效") }
+        let json = try await getJSON(url, ua: Self.browserUA)
+        let data = json["data"] as? [String: Any] ?? [:]
+        let list = data["info"] as? [[String: Any]] ?? []
+        let prefix = (data["enu_list"] as? [String: Any])?["prefix"] as? [String: Any] ?? [:]
+        _ = prefix
+        var result: [Artist] = []
+        var seen = Set<Int>()
+        for item in list {
+            guard let id = Self.playlistID(item["singerid"]), id > 0, seen.insert(id).inserted else { continue }
+            let pic = item["imgurl"] as? String ?? (item["img"] as? String ?? "")
+            result.append(Artist(
+                id: "kugou-\(id)",
+                name: item["singername"] as? String ?? "",
+                coverURL: pic.isEmpty ? nil : URL(string: pic),
+                source: .kugou
+            ))
+            if result.count >= max(limit, 1) { break }
+        }
+        return result
+    }
+
     private func searchSongsComplete(keyword: String, limit: Int) async throws -> [Song] {
         var result: [Song] = []
         var seen = Set<String>()
