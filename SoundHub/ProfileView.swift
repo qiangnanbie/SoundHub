@@ -878,8 +878,6 @@ struct AccountHubSheet: View {
     @AppStorage("soundhub.language") private var languageRaw = AppLanguage.chinese.rawValue
     @Environment(\.dismiss) private var dismiss
 
-    @State private var showAccountCenter = false
-    @State private var platformDisplayExpanded = false
     @State private var showNeteaseLogin = false
     @State private var showQQLogin = false
     @State private var showKugouLogin = false
@@ -1133,6 +1131,8 @@ struct SettingsView: View {
     @EnvironmentObject private var theme: ThemeStore
     @EnvironmentObject private var auth: AuthStore
     @ObservedObject private var platformPrefs = PlatformPreferenceStore.shared
+    @State private var showAccountCenter = false
+    @State private var platformDisplayExpanded = false
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("soundhub.themeMode") private var themeModeRaw = SoundHubThemeMode.system.rawValue
@@ -1188,8 +1188,6 @@ struct SettingsView: View {
     @ObservedObject private var sourceStore = UnblockSourceStore.shared
     @ObservedObject private var equalizer = SoundHubEqualizer.shared
     @AppStorage(ThirdPartyAudioQuality.storageKey) private var thirdPartyAudioQualityRaw = ThirdPartyAudioQuality.kb320.rawValue
-    @ObservedObject private var platformPrefs = PlatformPreferenceStore.shared
-
     @State private var appearanceExpanded = false
     @State private var platformExpanded = false
     @State private var playbackExpanded = false
